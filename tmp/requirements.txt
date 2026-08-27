@@ -15,7 +15,7 @@ pdf2image==1.17.0
 easyocr==1.7.2
 
 # Advanced parsing (optional)
-docling==2.12.1
+docling==2.121.0
 #unstructured==0.16.11
 
 # Note: Some libraries may require system dependencies:
