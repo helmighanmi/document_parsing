@@ -1,11 +1,18 @@
-# Path: app.py
+# Path: .dockerignore
 # Author: GHANMI Helmi
 # Current Role: AI Engineer
 # Past Role: Researcher in Applied Mathematics
 # Research Profile: https://www.researchgate.net/profile/Ghanmi-Helmi
 
-"""Streamlit entry point kept intentionally thin."""
-
-from document_parser.ui import run
-
-run()
+.git
+.github
+.venv
+__pycache__
+.pytest_cache
+.mypy_cache
+.ruff_cache
+tests
+docs
+outputs
+data
+*.zip
