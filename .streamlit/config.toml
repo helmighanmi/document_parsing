@@ -1,11 +1,12 @@
-# Path: app.py
+# Path: .streamlit/config.toml
 # Author: GHANMI Helmi
 # Current Role: AI Engineer
 # Past Role: Researcher in Applied Mathematics
 # Research Profile: https://www.researchgate.net/profile/Ghanmi-Helmi
 
-"""Streamlit entry point kept intentionally thin."""
+[server]
+maxUploadSize = 100
+headless = true
 
-from document_parser.ui import run
-
-run()
+[browser]
+gatherUsageStats = false

@@ -1,322 +1,231 @@
-# 📄 Universal Document Parser API
+<!--
+Path: README.md
+Author: GHANMI Helmi
+Current Role: AI Engineer
+Past Role: Researcher in Applied Mathematics
+Research Profile: https://www.researchgate.net/profile/Ghanmi-Helmi
+-->
 
-A powerful document parsing API with Streamlit demo interface that supports multiple file formats and parsing engines.
+# Document Parsing Workbench
 
-## 🌟 Features
+A production-oriented document ingestion toolkit for **PDF, DOCX, PPTX, XLSX, CSV, text, Markdown, and HTML**, with optional OCR/Docling backends, layout visualization, and page-aware RAG export.
 
-- **Multi-format Support**: PDF, Word, PowerPoint, Excel, Text files, HTML
-- **Multiple Parsing Engines**:
-  - PyMuPDF (Fast PDF parsing)
-  - PyMuPDF4LLM (LLM-optimized markdown output)
-  - pdfplumber (Excellent for tables)
-  - Docling (Advanced document understanding)
-  - Unstructured (Multi-format parsing)
-  - python-docx, python-pptx, openpyxl (Office formats)
-  - Tesseract OCR, EasyOCR (Scanned documents)
+The repository is intentionally structured to demonstrate the full engineering lifecycle around an AI-adjacent document pipeline: architecture, dependency management, defensive ingestion, deterministic testing, containerization, CI/CD, security checks, observability-ready logging, and operational documentation.
 
-- **Smart Features**:
-  - Auto-detection of best parsing tool
-  - Scanned/hybrid PDF detection
-  - Bounding box visualization
-  - Page-by-page navigation
-  - Image extraction
-  - Markdown export
-  - Table extraction
+## Architecture
 
-## 🚀 Installation
+```text
+User / CLI / Streamlit
+        |
+        v
++----------------------+       +----------------------+
+| Presentation Layer   |       | Safe URL Ingestion   |
+| ui.py / cli.py       |------>| security.py          |
++----------+-----------+       +----------+-----------+
+           |                              |
+           v                              v
++-----------------------------------------------------+
+| DocumentParser                                       |
+| format detection -> parser selection -> normalized  |
+| ParseResult contract                                |
++------------+----------------------+-----------------+
+             |                      |
+             v                      v
++-------------------------+   +------------------------+
+| Parser Backends         |   | PDF Inspection        |
+| PyMuPDF / pdfplumber    |   | scanned/hybrid/layout |
+| Office / CSV / OCR      |   +------------------------+
+| Docling / Unstructured  |
++------------+------------+
+             |
+             v
++-------------------------+      +---------------------+
+| Normalized ParseResult  |----->| RAG Export         |
+| content/pages/metadata  |      | chunk + provenance |
++-------------------------+      +---------------------+
+```
 
-### Prerequisites
+Detailed design: [`docs/architecture.md`](docs/architecture.md).
 
-For OCR functionality, install system dependencies:
+## Engineering signals
+
+- `src/` package layout with a thin Streamlit entry point.
+- Typed runtime configuration through environment variables.
+- Safe remote ingestion with scheme validation, DNS/IP checks, redirect validation, timeouts, and byte limits.
+- Explicit parser/format compatibility instead of silent misuse.
+- Deterministic unit and local integration tests without network calls.
+- Page-aware RAG chunks with stable IDs and source provenance.
+- Non-root, read-only Docker runtime with dropped Linux capabilities.
+- GitHub Actions for linting, typing, tests, Docker builds, dependency audit, and CodeQL.
+- ADRs explaining Python version, package structure, and ingestion security choices.
+
+## Python version
+
+**Python 3.11 is the reference runtime.** CI also validates Python 3.12. The project requires `>=3.11,<3.14`.
+
+This is a conservative compatibility baseline for the mixed document/ML ecosystem rather than a “newest Python at any cost” choice. Streamlit, PyMuPDF/PyMuPDF4LLM, and current Docling releases all support modern Python versions beginning at 3.10, while 3.11 remains a mature target for OCR/ML dependency stacks.
+
+See [`docs/decisions/001-python-runtime.md`](docs/decisions/001-python-runtime.md).
+
+## Quick start
 
 ```bash
-# Ubuntu/Debian
-sudo apt-get update
-sudo apt-get install -y tesseract-ocr poppler-utils
-
-# macOS
-brew install tesseract poppler
+python -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
+python -m pip install -e '.[dev]'
+make test
+make run
 ```
 
-### Python Dependencies
+Open `http://localhost:8501`.
+
+### OCR support
 
 ```bash
-# Basic installation
-pip install -r requirements.txt
+# Ubuntu/Debian system packages
+sudo apt-get install tesseract-ocr poppler-utils
 
-# Or install core dependencies only
-pip install streamlit PyMuPDF pymupdf4llm pdfplumber python-docx python-pptx openpyxl Pillow requests
+# Python OCR adapter
+python -m pip install -e '.[ocr]'
 ```
 
-### Optional Dependencies
-
-For advanced features:
+Additional backends are optional:
 
 ```bash
-# OCR support
-pip install pytesseract pdf2image easyocr
-
-# Advanced parsing (requires additional system dependencies)
-pip install docling unstructured
+python -m pip install -e '.[docling]'
+python -m pip install -e '.[easyocr]'
+python -m pip install -e '.[unstructured]'
 ```
 
-## 💻 Usage
-
-### Run the Streamlit Demo
+## CLI
 
 ```bash
-streamlit run app.py
+document-parser report.pdf --output report.md
+document-parser report.pdf --rag --output report.rag.json
 ```
 
-The app will open in your browser at `http://localhost:8501`
+Or without installing the console script:
 
-### Using the API Programmatically
-
-```python
-from parsers import DocumentParser
-
-# Initialize parser
-parser = DocumentParser(
-    tool=None,  # Auto-select best tool
-    detect_scanned=True,
-    extract_images=True,
-    ocr_lang='eng'
-)
-
-# Parse a document
-results = parser.parse('path/to/document.pdf')
-
-# Access results
-print(results['content'])  # Markdown content
-print(results['metadata'])  # Document metadata
-print(results['pages'])     # Page-by-page content
+```bash
+python -m document_parser.cli report.pdf --rag
 ```
 
-### Specify a Specific Tool
+## Programmatic API
 
 ```python
-# Use PyMuPDF4LLM specifically
-parser = DocumentParser(tool='pymupdf4llm')
-results = parser.parse('document.pdf')
+from document_parser import DocumentParser, build_rag_json
 
-# Use Tesseract OCR for scanned PDFs
-parser = DocumentParser(tool='tesseract_ocr', ocr_lang='eng')
-results = parser.parse('scanned.pdf')
-
-# Use pdfplumber for table-heavy documents
-parser = DocumentParser(tool='pdfplumber')
-results = parser.parse('tables.pdf')
+parser = DocumentParser()
+result = parser.parse("report.pdf")
+rag = build_rag_json(result, "report.pdf", chunk_size=900, overlap=120)
 ```
 
-## 📖 Interface Guide
+## Supported formats
 
-### Input Methods
+| Format | Extensions | Default strategy |
+| --- | --- | --- |
+| PDF | `.pdf` | scanned detection, then PyMuPDF4LLM/PyMuPDF or OCR |
+| Word | `.docx` | python-docx |
+| PowerPoint | `.pptx` | python-pptx |
+| Excel | `.xlsx` | openpyxl |
+| CSV | `.csv` | Python CSV parser |
+| Text | `.txt`, `.md`, `.markdown`, `.html`, `.htm` | built-in text reader |
 
-1. **Upload File**: Drag and drop or browse for files
-2. **File Path**: Enter local file path
-3. **URL**: Enter URL to download and parse
+Legacy binary Office formats (`.doc`, `.ppt`, `.xls`) are deliberately **not advertised as supported**, because the selected libraries do not parse those formats reliably without conversion or additional dependencies.
 
-### Parser Selection
+## RAG export contract
 
-- **Auto (Recommended)**: Automatically selects best parser based on document type
-- **Manual Selection**: Choose specific parser for your use case
+The RAG exporter produces stable, page-aware chunks:
 
-### Display Options
-
-1. **Markdown View**: Full document in markdown format
-2. **Page-by-Page View**: Navigate through individual pages
-3. **Bounding Box Visualization**: 
-   - Blue boxes: Text blocks
-   - Red boxes: Images
-
-### PDF Analysis
-
-For PDFs, the system automatically detects:
-- Document Type: Digital, Scanned, or Hybrid
-- Pages with/without text
-- Scanned pages requiring OCR
-- Hybrid pages with both text and images
-
-## 🔧 Supported File Types
-
-| Format | Extensions | Best Parser |
-|--------|-----------|-------------|
-| PDF (Digital) | `.pdf` | PyMuPDF4LLM |
-| PDF (Scanned) | `.pdf` | Tesseract OCR / EasyOCR |
-| PDF (Tables) | `.pdf` | pdfplumber |
-| Word | `.docx`, `.doc` | python-docx |
-| PowerPoint | `.pptx`, `.ppt` | python-pptx |
-| Excel | `.xlsx`, `.xls` | openpyxl |
-| Text | `.txt`, `.md`, `.html` | Built-in |
-
-## 🎯 Use Cases
-
-### 1. Academic Paper Analysis
-```python
-parser = DocumentParser(tool='pymupdf4llm')
-results = parser.parse('research_paper.pdf')
-markdown = results['content']  # LLM-ready markdown
-```
-
-### 2. Invoice Processing
-```python
-parser = DocumentParser(tool='pdfplumber')
-results = parser.parse('invoice.pdf')
-# Tables are extracted and formatted in markdown
-```
-
-### 3. Scanned Document OCR
-```python
-parser = DocumentParser(
-    tool='tesseract_ocr',
-    ocr_lang='eng',
-    detect_scanned=True
-)
-results = parser.parse('scanned_contract.pdf')
-```
-
-### 4. Multi-format Documentation
-```python
-parser = DocumentParser()  # Auto-detect
-for doc in ['report.pdf', 'data.xlsx', 'slides.pptx']:
-    results = parser.parse(doc)
-    print(f"{doc}: {results['tool_used']}")
-```
-
-## 🎨 Visualization Examples
-
-The bounding box visualization helps you understand:
-- Document layout and structure
-- Image placement
-- Text block organization
-- Table detection
-
-Perfect for:
-- Document analysis
-- Layout understanding
-- Debugging parsing issues
-- Quality control
-
-## 📊 Output Format
-
-```python
+```json
 {
-    'tool_used': 'PyMuPDF4LLM',
-    'content': '# Document Title\n\n...',  # Full markdown
-    'pages': [
-        {
-            'page_number': 1,
-            'content': 'Page content...',
-            'bboxes': [...],  # Optional
-            'metadata': {...}
-        }
-    ],
-    'images': [
-        {
-            'page': 1,
-            'image': b'...',
-            'ext': 'png'
-        }
-    ],
-    'metadata': {
-        'page_count': 10,
-        ...
-    },
-    'pdf_analysis': {  # For PDFs only
-        'type': 'Digital',
-        'total_pages': 10,
-        'scanned_pages': [],
-        'hybrid_pages': [5, 6]
+  "schema": "rag_chunks_v1",
+  "document": {
+    "file_name": "report.pdf",
+    "file_type": "pdf",
+    "tool_used": "PyMuPDF"
+  },
+  "chunks": [
+    {
+      "id": "...",
+      "text": "...",
+      "metadata": {
+        "page": 1,
+        "chunk_index": 0
+      }
     }
+  ]
 }
 ```
 
-## 🔍 Tool Selection Logic
+`overlap` must be smaller than `chunk_size`; the implementation validates this and guarantees forward progress.
 
-The auto-selection algorithm:
+## Quality commands
 
-1. **Check file type** (PDF, Word, Excel, etc.)
-2. **For PDFs**:
-   - Analyze first few pages
-   - Detect if scanned (>70% pages without text)
-   - Choose OCR if scanned, otherwise PyMuPDF4LLM
-3. **For other formats**:
-   - Use format-specific parser (python-docx, python-pptx, etc.)
-
-## 🌐 Free Tools (No GPU/Payment Required)
-
-All included tools are free and open-source:
-- ✅ PyMuPDF - MIT License
-- ✅ pdfplumber - MIT License
-- ✅ python-docx - MIT License
-- ✅ python-pptx - MIT License
-- ✅ openpyxl - MIT License
-- ✅ Tesseract OCR - Apache 2.0 License
-- ✅ EasyOCR - Apache 2.0 License (CPU mode available)
-
-Optional tools:
-- Docling - Free but may require more resources
-- Unstructured - Free with some features requiring API
-
-## 🐛 Troubleshooting
-
-### OCR Not Working
 ```bash
-# Install Tesseract
-sudo apt-get install tesseract-ocr tesseract-ocr-eng
-
-# For other languages
-sudo apt-get install tesseract-ocr-fra  # French
-sudo apt-get install tesseract-ocr-deu  # German
+make lint
+make typecheck
+make test
+make test-integration
+make security
+make ci
 ```
 
-### PDF to Image Conversion Fails
+## Docker
+
 ```bash
-# Install Poppler
-sudo apt-get install poppler-utils
+docker compose up --build
 ```
 
-### Import Errors
-```bash
-# Install missing packages
-pip install <package_name>
+The default image includes Tesseract + Poppler and installs the Python `ocr` extra. Heavyweight ML backends such as EasyOCR and Docling are intentionally not baked into the default runtime image.
+
+## Security model
+
+The public Streamlit UI allows upload and public HTTP(S) URL ingestion. Arbitrary local-path input is disabled by default.
+
+Remote URLs are protected by:
+
+- HTTP/HTTPS-only policy;
+- no embedded URL credentials;
+- private, loopback, link-local, multicast, reserved, and unspecified IP rejection;
+- validation before every redirect;
+- connect/read timeouts;
+- content-length and streaming byte limits.
+
+See [`SECURITY.md`](SECURITY.md) and [`docs/decisions/003-safe-remote-ingestion.md`](docs/decisions/003-safe-remote-ingestion.md).
+
+## Dependency licensing
+
+This repository's source code is MIT-licensed. **Dependencies retain their own licenses.** In particular, PyMuPDF and PyMuPDF4LLM are currently offered under AGPL-3.0 or a commercial Artifex license. Review [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md) before redistributing or using the dependency stack in a proprietary service.
+
+## Repository structure
+
+```text
+.
+├── .github/workflows/        # CI and security automation
+├── docs/                     # architecture, ADRs, runbook
+├── examples/                 # minimal integration examples
+├── src/document_parser/
+│   ├── cli.py                # automation interface
+│   ├── config.py             # typed runtime settings
+│   ├── exceptions.py         # domain errors
+│   ├── parser.py             # parser orchestration/backends
+│   ├── rag.py                # RAG chunking/export
+│   ├── security.py           # safe URL ingestion
+│   ├── ui.py                 # Streamlit presentation
+│   └── visualizer.py         # PDF layout visualization
+├── tests/unit/
+├── tests/integration/
+├── Dockerfile
+├── docker-compose.yml
+├── Makefile
+└── pyproject.toml
 ```
 
-## 📝 Contributing
+## Author
 
-This is a learning project. Feel free to:
-- Add new parsing engines
-- Improve visualization features
-- Add support for more formats
-- Enhance OCR accuracy
-
-## 🎓 Learning Resources
-
-Great for students learning:
-- Document processing
-- Computer vision (OCR, layout detection)
-- Python libraries (Streamlit, PIL, PyMuPDF)
-- API design
-- Multi-tool integration
-
-## 📄 License
-
-This project is for educational purposes. Individual libraries have their own licenses (see requirements.txt).
-
-## 🔗 Related Tools
-
-- [PyMuPDF Documentation](https://pymupdf.readthedocs.io/)
-- [Streamlit Documentation](https://docs.streamlit.io/)
-- [Tesseract OCR](https://github.com/tesseract-ocr/tesseract)
-- [pdfplumber](https://github.com/jsvine/pdfplumber)
-
-## 💡 Tips for Job Applications
-
-When adding to your portfolio:
-1. Demo the live application
-2. Explain tool selection logic
-3. Show sample outputs for different document types
-4. Discuss challenges (OCR accuracy, table detection)
-5. Highlight extensibility and clean code structure
-
-Good luck with your job search! 🚀
+**GHANMI Helmi**  
+Current Role: AI Engineer  
+Past Role: Researcher in Applied Mathematics  
+Research profile: https://www.researchgate.net/profile/Ghanmi-Helmi

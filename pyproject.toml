@@ -1,0 +1,93 @@
+# Path: pyproject.toml
+# Author: GHANMI Helmi
+# Current Role: AI Engineer
+# Past Role: Researcher in Applied Mathematics
+# Research Profile: https://www.researchgate.net/profile/Ghanmi-Helmi
+
+[build-system]
+requires = ["setuptools>=75", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "document-parsing-workbench"
+version = "2.0.0"
+description = "Production-oriented multi-format document parsing, OCR, visualization, and RAG export toolkit."
+readme = "README.md"
+requires-python = ">=3.11,<3.14"
+license = {text = "MIT"}
+authors = [{name = "GHANMI Helmi"}]
+dependencies = [
+  "streamlit>=1.40,<2",
+  "PyMuPDF>=1.25,<2",
+  "pymupdf4llm>=0.0.17,<2",
+  "pdfplumber>=0.11,<1",
+  "python-docx>=1.1,<2",
+  "python-pptx>=1.0,<2",
+  "openpyxl>=3.1,<4",
+  "Pillow>=11,<13",
+  "requests>=2.32,<3",
+]
+
+[project.optional-dependencies]
+ocr = [
+  "pytesseract>=0.3.13,<0.4",
+  "pdf2image>=1.17,<2",
+]
+easyocr = [
+  "easyocr>=1.7.2,<2",
+  "pdf2image>=1.17,<2",
+  "numpy>=1.26,<3",
+]
+docling = ["docling>=2.70,<3"]
+unstructured = ["unstructured>=0.16,<1"]
+dev = [
+  "pytest>=8.3,<10",
+  "pytest-cov>=6,<8",
+  "ruff>=0.12,<1",
+  "mypy>=1.15,<2",
+  "types-requests>=2.32,<3",
+  "pip-audit>=2.8,<3",
+]
+
+[project.scripts]
+document-parser = "document_parser.cli:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+addopts = "-ra --strict-markers --strict-config"
+testpaths = ["tests"]
+markers = [
+  "integration: tests that exercise real local document libraries",
+  "optional: tests that require heavyweight optional dependencies",
+]
+
+[tool.ruff]
+line-length = 110
+target-version = "py311"
+extend-exclude = [".venv"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "SIM", "RUF"]
+ignore = ["E501"]
+
+[tool.mypy]
+python_version = "3.11"
+warn_unused_ignores = true
+warn_redundant_casts = true
+check_untyped_defs = true
+no_implicit_optional = true
+ignore_missing_imports = true
+
+[tool.coverage.run]
+source = ["document_parser"]
+branch = true
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = true
+fail_under = 70
