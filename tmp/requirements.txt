@@ -7,7 +7,7 @@ python-pptx==1.0.2
 openpyxl==3.1.5
 pandas==2.2.3
 Pillow==11.0.0
-requests==2.32.3
+requests==2.34.2
 
 # OCR libraries (optional)
 pytesseract==0.3.13
